@@ -34,7 +34,6 @@ export function UploadForm() {
 
       formRef.current?.reset();
       setFileName(null);
-      router.push(`/sheets/${body.sheet.id}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao importar planilha.");
