@@ -33,8 +33,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brand-900 via-brand-950 to-brand-950 px-4">
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl shadow-black/20">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 px-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1.5px 1.5px, white 1.5px, transparent 0)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl shadow-black/20">
         <div className="flex flex-col items-center gap-3 bg-brand-900 px-8 py-8 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-sm font-bold tracking-wide text-brand-900">
             DCV
