@@ -33,7 +33,7 @@ export default async function SheetsPage() {
   const supabase = await createClient();
   const { data: sheets } = await supabase
     .from("sheets")
-    .select("id, name, original_filename, row_count, created_at")
+    .select("id, name, original_filename, row_count, created_at, updated_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 

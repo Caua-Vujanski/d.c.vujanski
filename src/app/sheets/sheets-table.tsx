@@ -11,6 +11,7 @@ interface SheetSummary {
   original_filename: string | null;
   row_count: number;
   created_at: string;
+  updated_at: string;
 }
 
 export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
@@ -95,6 +96,7 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
               <th className="px-4 py-3 font-medium">Arquivo original</th>
               <th className="px-4 py-3 font-medium">Linhas</th>
               <th className="px-4 py-3 font-medium">Importada em</th>
+              <th className="px-4 py-3 font-medium">Editada em</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -123,6 +125,9 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   {new Date(sheet.created_at).toLocaleString("pt-BR")}
+                </td>
+                <td className="px-4 py-3 text-gray-500">
+                  {new Date(sheet.updated_at).toLocaleString("pt-BR")}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100">
