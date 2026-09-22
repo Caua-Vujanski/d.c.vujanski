@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { IWorkbookData } from "@univerjs/core";
 import { createClient } from "@/lib/supabase/server";
-import { buildWorkbookBuffer, type SheetColumn } from "@/lib/spreadsheet";
+import { buildWorkbookBuffer } from "@/lib/spreadsheet";
+import { snapshotToColumnsAndRows } from "@/lib/univer-sheet";
 
 export async function GET(
   _request: Request,
@@ -29,20 +31,11 @@ export async function GET(
     );
   }
 
-  const { data: rows, error: rowsError } = await supabase
-    .from("sheet_rows")
-    .select("data")
-    .eq("sheet_id", id)
-    .order("row_index", { ascending: true });
-
-  if (rowsError) {
-    return NextResponse.json({ error: rowsError.message }, { status: 500 });
-  }
-
-  const buffer = await buildWorkbookBuffer(
-    sheet.columns as SheetColumn[],
-    (rows ?? []).map((r) => r.data as Record<string, unknown>),
+  const { columns, rows } = snapshotToColumnsAndRows(
+    sheet.univer_data as IWorkbookData,
   );
+
+  const buffer = await buildWorkbookBuffer(columns, rows);
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

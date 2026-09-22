@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import type { IWorkbookData } from "@univerjs/core";
 import { createClient } from "@/lib/supabase/server";
 import type { SheetColumn } from "@/lib/spreadsheet";
-import { SheetGrid } from "./sheet-grid";
+import { buildInitialSnapshot } from "@/lib/univer-sheet";
+import { UniverSheetEditor } from "./univer-sheet-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -21,34 +24,44 @@ export default async function SheetPage({
 
   if (!sheet) notFound();
 
-  const { data: rows } = await supabase
-    .from("sheet_rows")
-    .select("id, row_index, data")
-    .eq("sheet_id", id)
-    .order("row_index", { ascending: true });
+  let snapshot = sheet.univer_data as IWorkbookData | null;
+
+  if (!snapshot) {
+    const { data: legacyRows } = await supabase
+      .from("sheet_rows")
+      .select("data")
+      .eq("sheet_id", id)
+      .order("row_index", { ascending: true });
+
+    snapshot = buildInitialSnapshot(
+      sheet.id,
+      sheet.name,
+      (sheet.columns as SheetColumn[]) ?? [],
+      (legacyRows ?? []).map((r) => r.data as Record<string, unknown>),
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{sheet.name}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {sheet.original_filename} · {rows?.length ?? 0} linhas
-          </p>
-        </div>
-        <a
-          href={`/api/sheets/${sheet.id}/export`}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="shrink-0 px-4 pt-3 pb-2 sm:px-6">
+        <Link
+          href="/sheets"
+          className="mb-1 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-900"
         >
-          Exportar .xlsx
-        </a>
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg>
+          Voltar
+        </Link>
+        <h1 className="truncate text-xl font-semibold text-brand-950">{sheet.name}</h1>
+        <p className="text-xs text-gray-500">
+          {sheet.original_filename} · {sheet.row_count} linhas
+        </p>
       </div>
 
-      <SheetGrid
-        sheetId={sheet.id}
-        columns={sheet.columns as SheetColumn[]}
-        initialRows={rows ?? []}
-      />
+      <div className="min-h-0 flex-1 px-4 pb-4 sm:px-6">
+        <UniverSheetEditor sheetId={sheet.id} initialSnapshot={snapshot} />
+      </div>
     </div>
   );
 }

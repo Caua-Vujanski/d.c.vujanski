@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { parseSpreadsheet } from "@/lib/spreadsheet";
+import { buildInitialSnapshot } from "@/lib/univer-sheet";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS = [".xlsx", ".xls", ".csv"];
@@ -87,27 +88,27 @@ export async function POST(request: Request) {
       .eq("id", sheet.id);
   }
 
-  if (parsed.rows.length > 0) {
-    const rowsToInsert = parsed.rows.map((data, index) => ({
-      sheet_id: sheet.id,
-      row_index: index,
-      data,
-    }));
+  const univerData = buildInitialSnapshot(
+    sheet.id,
+    sheet.name,
+    parsed.columns,
+    parsed.rows,
+  );
 
-    const CHUNK_SIZE = 500;
-    for (let i = 0; i < rowsToInsert.length; i += CHUNK_SIZE) {
-      const chunk = rowsToInsert.slice(i, i + CHUNK_SIZE);
-      const { error: rowsError } = await supabase
-        .from("sheet_rows")
-        .insert(chunk);
-      if (rowsError) {
-        return NextResponse.json(
-          { error: `Falha ao importar linhas: ${rowsError.message}` },
-          { status: 500 },
-        );
-      }
-    }
+  const { error: snapshotError } = await supabase
+    .from("sheets")
+    .update({ univer_data: univerData })
+    .eq("id", sheet.id);
+
+  if (snapshotError) {
+    return NextResponse.json(
+      { error: `Falha ao preparar a planilha: ${snapshotError.message}` },
+      { status: 500 },
+    );
   }
 
-  return NextResponse.json({ sheet }, { status: 201 });
+  return NextResponse.json(
+    { sheet: { ...sheet, univer_data: univerData } },
+    { status: 201 },
+  );
 }

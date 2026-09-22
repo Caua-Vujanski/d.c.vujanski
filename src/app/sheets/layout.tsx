@@ -7,16 +7,21 @@ export default function SheetsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="flex h-screen flex-col bg-background">
+      <header className="shrink-0 bg-brand-900 shadow-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/sheets" className="font-semibold text-gray-900">
-            dcvujanski-system
+          <Link href="/sheets" className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-900">
+              DCV
+            </span>
+            <span className="font-semibold text-white">
+              D.C.Camargo Vujanski
+            </span>
           </Link>
           <LogoutButton />
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="flex min-h-0 flex-1 flex-col">{children}</main>
     </div>
   );
 }

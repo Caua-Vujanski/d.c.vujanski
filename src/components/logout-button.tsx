@@ -16,7 +16,7 @@ export function LogoutButton() {
   return (
     <button
       onClick={handleLogout}
-      className="text-sm text-gray-500 hover:text-gray-900"
+      className="text-sm text-brand-200 hover:text-white"
     >
       Sair
     </button>

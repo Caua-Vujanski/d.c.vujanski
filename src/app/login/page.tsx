@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,60 +49,83 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-6 text-xl font-semibold text-gray-900">
-          {mode === "signin" ? "Entrar" : "Criar conta"}
-        </h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              E-mail
-            </label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-            />
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brand-900 via-brand-950 to-brand-950 px-4">
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl shadow-black/20">
+        <div className="flex flex-col items-center gap-3 bg-brand-900 px-8 py-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-sm font-bold tracking-wide text-brand-900">
+            DCV
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Senha
-            </label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-            />
+            <p className="text-base font-semibold text-white">
+              D.C.Camargo Vujanski
+            </p>
+            <p className="text-xs text-brand-200">Sistema de Planilhas</p>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {info && <p className="text-sm text-green-600">{info}</p>}
+        </div>
+        <div className="p-8">
+          <h1 className="mb-6 text-lg font-semibold text-brand-950">
+            {mode === "signin" ? "Entrar" : "Criar conta"}
+          </h1>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                E-mail
+              </label>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Senha
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={6}
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-brand-700"
+                >
+                  {showPassword ? "Ocultar" : "Ver"}
+                </button>
+              </div>
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            {info && <p className="text-sm text-brand-600">{info}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+            >
+              {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
+            </button>
+          </form>
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            type="button"
+            onClick={() => {
+              setMode(mode === "signin" ? "signup" : "signin");
+              setError(null);
+              setInfo(null);
+            }}
+            className="mt-4 w-full text-center text-sm text-gray-500 hover:text-brand-700"
           >
-            {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
+            {mode === "signin" ? "Não tem conta? Criar uma" : "Já tem conta? Entrar"}
           </button>
-        </form>
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError(null);
-            setInfo(null);
-          }}
-          className="mt-4 w-full text-center text-sm text-gray-500 hover:text-gray-700"
-        >
-          {mode === "signin" ? "Não tem conta? Criar uma" : "Já tem conta? Entrar"}
-        </button>
+        </div>
       </div>
     </div>
   );
