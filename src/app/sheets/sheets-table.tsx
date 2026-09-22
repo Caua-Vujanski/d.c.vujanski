@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 interface SheetSummary {
@@ -12,13 +13,30 @@ interface SheetSummary {
 }
 
 export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return sheets;
     return sheets.filter((sheet) => sheet.name.toLowerCase().includes(q));
   }, [sheets, query]);
+
+  async function handleTrash(sheet: SheetSummary) {
+    if (!window.confirm(`Mover "${sheet.name}" para a lixeira?`)) return;
+    setBusyId(sheet.id);
+    try {
+      await fetch(`/api/sheets/${sheet.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "trash" }),
+      });
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   if (sheets.length === 0) {
     return (
@@ -104,16 +122,29 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
                 <td className="px-4 py-3 text-gray-500">
                   {new Date(sheet.created_at).toLocaleString("pt-BR")}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <Link
-                    href={`/sheets/${sheet.id}`}
-                    className="text-brand-600 opacity-0 transition-opacity group-hover:opacity-100"
-                    aria-label={`Abrir ${sheet.name}`}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor" className="ml-auto h-4 w-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                    </svg>
-                  </Link>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => void handleTrash(sheet)}
+                      disabled={busyId === sheet.id}
+                      aria-label={`Mover ${sheet.name} para a lixeira`}
+                      className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.75} stroke="currentColor" className="h-4 w-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                      </svg>
+                    </button>
+                    <Link
+                      href={`/sheets/${sheet.id}`}
+                      className="text-brand-600"
+                      aria-label={`Abrir ${sheet.name}`}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

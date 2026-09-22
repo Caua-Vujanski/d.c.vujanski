@@ -30,10 +30,25 @@ export function UniverSheetEditor({
     container.style.height = "100%";
     host.append(container);
 
+    const ptBR = mergeLocales(UniverPresetSheetsCorePtBR) as Record<string, Record<string, unknown>>;
+
     const { univer, univerAPI } = createUniver({
       locale: LocaleType.PT_BR,
       locales: {
-        [LocaleType.PT_BR]: mergeLocales(UniverPresetSheetsCorePtBR),
+        [LocaleType.PT_BR]: {
+          ...ptBR,
+          // Corrige chaves de tradução ausentes nesta versão do Univer
+          // (o aviso "valor guardado como texto" vem sem traducao, ver
+          // @univerjs/sheets-ui@0.25.1 lib/es/index.js).
+          "sheets-ui": {
+            ...ptBR["sheets-ui"],
+            info: {
+              ...(ptBR["sheets-ui"]?.info as Record<string, string> | undefined),
+              error: "Erro",
+              forceStringInfo: "Número armazenado como texto",
+            },
+          },
+        },
       },
       presets: [UniverSheetsCorePreset({ container })],
     });
