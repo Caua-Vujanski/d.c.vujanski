@@ -33,12 +33,24 @@ export default async function SheetPage({
       .eq("sheet_id", id)
       .order("row_index", { ascending: true });
 
-    snapshot = buildInitialSnapshot(
-      sheet.id,
-      sheet.name,
-      (sheet.columns as SheetColumn[]) ?? [],
-      (legacyRows ?? []).map((r) => r.data as Record<string, unknown>),
-    );
+    const columns = (sheet.columns as SheetColumn[]) ?? [];
+    const rows = (legacyRows ?? []).map((r) => r.data as Record<string, unknown>);
+    const grid: unknown[][] = [
+      columns.map((col) => col.label),
+      ...rows.map((row) => columns.map((col) => row[col.key] ?? null)),
+    ];
+
+    snapshot = buildInitialSnapshot(sheet.id, sheet.name, {
+      sheets: [
+        {
+          name: sheet.name,
+          grid,
+          rowCount: grid.length,
+          colCount: columns.length,
+          merges: [],
+        },
+      ],
+    });
   }
 
   return (

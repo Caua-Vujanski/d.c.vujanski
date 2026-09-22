@@ -1,94 +1,117 @@
-import type { ICellData, IWorkbookData, LocaleType } from "@univerjs/core";
-import type { SheetColumn } from "./spreadsheet";
+import type { ICellData, IRange, IWorkbookData, IWorksheetData, LocaleType } from "@univerjs/core";
+import type { ParsedGridSheet, ParsedWorkbook } from "./spreadsheet";
 
 const CELL_TYPE_STRING = 1 as ICellData["t"];
 const CELL_TYPE_NUMBER = 2 as ICellData["t"];
 const PT_BR = "ptBR" as LocaleType;
 
 function toCellData(value: unknown): ICellData {
-  if (value === null || value === undefined) return { v: "" };
+  if (value === null || value === undefined || value === "") return { v: "" };
   if (typeof value === "number") return { v: value, t: CELL_TYPE_NUMBER };
   if (typeof value === "boolean") return { v: value };
   return { v: String(value), t: CELL_TYPE_STRING };
 }
 
-export function buildInitialSnapshot(
-  sheetId: string,
-  sheetName: string,
-  columns: SheetColumn[],
-  rows: Record<string, unknown>[],
-): IWorkbookData {
-  const cellData: Record<number, Record<number, ICellData>> = {
-    0: Object.fromEntries(
-      columns.map((col, colIndex) => [
-        colIndex,
-        { v: col.label, t: CELL_TYPE_STRING } satisfies ICellData,
-      ]),
-    ),
-  };
+function sheetIdFor(workbookId: string, index: number): string {
+  return `${workbookId}-sheet-${index}`;
+}
 
-  rows.forEach((row, rowIndex) => {
-    cellData[rowIndex + 1] = Object.fromEntries(
-      columns.map((col, colIndex) => [colIndex, toCellData(row[col.key])]),
-    );
+// Constrói um workbook Univer preservando todas as abas da planilha original
+// (em vez de achatar tudo numa única tabela com "linha 1 = cabeçalho").
+export function buildInitialSnapshot(
+  workbookId: string,
+  workbookName: string,
+  parsed: ParsedWorkbook,
+): IWorkbookData {
+  const sheetIds = parsed.sheets.map((_, index) => sheetIdFor(workbookId, index));
+
+  const sheets: Record<string, Partial<IWorksheetData>> = {};
+  parsed.sheets.forEach((sheet, index) => {
+    const sheetId = sheetIds[index];
+    sheets[sheetId] = buildWorksheetData(sheetId, sheet);
   });
 
   return {
-    id: sheetId,
-    name: sheetName,
+    id: workbookId,
+    name: workbookName,
     appVersion: "0.25.1",
     locale: PT_BR,
     styles: {},
-    sheetOrder: [sheetId],
-    sheets: {
-      [sheetId]: {
-        id: sheetId,
-        name: sheetName,
-        rowCount: Math.max(rows.length + 1, 100),
-        columnCount: Math.max(columns.length, 26),
-        cellData,
-      },
-    },
+    sheetOrder: sheetIds,
+    sheets,
   };
 }
 
-export function snapshotToColumnsAndRows(snapshot: IWorkbookData): {
-  columns: SheetColumn[];
-  rows: Record<string, unknown>[];
-} {
-  const sheetId = snapshot.sheetOrder?.[0];
-  const cellData = (sheetId && snapshot.sheets?.[sheetId]?.cellData) || {};
+function buildWorksheetData(sheetId: string, sheet: ParsedGridSheet): Partial<IWorksheetData> {
+  const cellData: Record<number, Record<number, ICellData>> = {};
 
-  const rowIndexes = Object.keys(cellData)
-    .map(Number)
-    .sort((a, b) => a - b);
-
-  if (rowIndexes.length === 0) return { columns: [], rows: [] };
-
-  const headerRowIndex = rowIndexes[0];
-  const headerRow = cellData[headerRowIndex] ?? {};
-  const colIndexes = Object.keys(headerRow)
-    .map(Number)
-    .sort((a, b) => a - b);
-
-  const columns: SheetColumn[] = colIndexes.map((colIndex, i) => ({
-    key: `col_${i + 1}`,
-    label: String(headerRow[colIndex]?.v ?? `Coluna ${i + 1}`),
-  }));
-
-  const rows: Record<string, unknown>[] = [];
-  rowIndexes.slice(1).forEach((rowIndex) => {
-    const dataRow = cellData[rowIndex];
-    if (!dataRow) return;
-    const rowData: Record<string, unknown> = {};
-    let hasValue = false;
-    columns.forEach((col, i) => {
-      const value = dataRow[colIndexes[i]]?.v ?? null;
-      if (value !== null && value !== "") hasValue = true;
-      rowData[col.key] = value;
+  sheet.grid.forEach((rowValues, rowIndex) => {
+    if (!rowValues) return;
+    const rowCells: Record<number, ICellData> = {};
+    rowValues.forEach((value, colIndex) => {
+      if (value === undefined) return;
+      rowCells[colIndex] = toCellData(value);
     });
-    if (hasValue) rows.push(rowData);
+    cellData[rowIndex] = rowCells;
   });
 
-  return { columns, rows };
+  const mergeData: IRange[] = sheet.merges.map((merge) => ({
+    startRow: merge.top,
+    startColumn: merge.left,
+    endRow: merge.bottom,
+    endColumn: merge.right,
+  }));
+
+  return {
+    id: sheetId,
+    name: sheet.name,
+    rowCount: Math.max(sheet.rowCount + 20, 100),
+    columnCount: Math.max(sheet.colCount, 26),
+    cellData,
+    mergeData,
+  };
+}
+
+// Extrai todas as abas do snapshot como grades brutas, para exportação fiel.
+export function snapshotToSheets(snapshot: IWorkbookData): ParsedGridSheet[] {
+  const sheetIds = snapshot.sheetOrder ?? [];
+
+  return sheetIds.map((sheetId) => {
+    const sheetData = snapshot.sheets?.[sheetId];
+    const cellData = sheetData?.cellData ?? {};
+
+    const rowIndexes = Object.keys(cellData).map(Number);
+    const maxRow = rowIndexes.length ? Math.max(...rowIndexes) : -1;
+
+    const grid: unknown[][] = [];
+    let colCount = 0;
+    for (let rowIndex = 0; rowIndex <= maxRow; rowIndex++) {
+      const dataRow = cellData[rowIndex];
+      if (!dataRow) continue;
+      const colIndexes = Object.keys(dataRow).map(Number);
+      if (colIndexes.length === 0) continue;
+      const maxCol = Math.max(...colIndexes);
+      const rowValues: unknown[] = [];
+      colIndexes.forEach((colIndex) => {
+        rowValues[colIndex] = dataRow[colIndex]?.v ?? null;
+      });
+      grid[rowIndex] = rowValues;
+      colCount = Math.max(colCount, maxCol + 1);
+    }
+
+    const merges = (sheetData?.mergeData ?? []).map((range) => ({
+      top: range.startRow,
+      left: range.startColumn,
+      bottom: range.endRow,
+      right: range.endColumn,
+    }));
+
+    return {
+      name: sheetData?.name ?? "Planilha",
+      grid,
+      rowCount: grid.length,
+      colCount,
+      merges,
+    } satisfies ParsedGridSheet;
+  });
 }

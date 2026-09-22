@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { parseSpreadsheet } from "@/lib/spreadsheet";
+import { parseWorkbook } from "@/lib/spreadsheet";
 import { buildInitialSnapshot } from "@/lib/univer-sheet";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -47,12 +47,14 @@ export async function POST(request: Request) {
 
   let parsed;
   try {
-    parsed = await parseSpreadsheet(buffer, file.name);
+    parsed = await parseWorkbook(buffer, file.name);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Falha ao ler a planilha.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
+
+  const totalRowCount = parsed.sheets.reduce((sum, s) => sum + s.rowCount, 0);
 
   const { data: sheet, error: insertError } = await supabase
     .from("sheets")
@@ -60,8 +62,8 @@ export async function POST(request: Request) {
       owner_id: user.id,
       name: name || file.name.replace(/\.[^.]+$/, ""),
       original_filename: file.name,
-      columns: parsed.columns,
-      row_count: parsed.rows.length,
+      columns: [],
+      row_count: totalRowCount,
     })
     .select()
     .single();
@@ -88,12 +90,7 @@ export async function POST(request: Request) {
       .eq("id", sheet.id);
   }
 
-  const univerData = buildInitialSnapshot(
-    sheet.id,
-    sheet.name,
-    parsed.columns,
-    parsed.rows,
-  );
+  const univerData = buildInitialSnapshot(sheet.id, sheet.name, parsed);
 
   const { error: snapshotError } = await supabase
     .from("sheets")

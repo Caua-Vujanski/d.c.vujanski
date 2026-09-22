@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { IWorkbookData } from "@univerjs/core";
 import { createClient } from "@/lib/supabase/server";
-import { snapshotToColumnsAndRows } from "@/lib/univer-sheet";
+import { snapshotToSheets } from "@/lib/univer-sheet";
 
 export async function PUT(
   request: Request,
@@ -27,11 +27,14 @@ export async function PUT(
     );
   }
 
-  const { rows } = snapshotToColumnsAndRows(snapshot);
+  const totalRowCount = snapshotToSheets(snapshot).reduce(
+    (sum, s) => sum + s.rowCount,
+    0,
+  );
 
   const { error: updateError } = await supabase
     .from("sheets")
-    .update({ univer_data: snapshot, row_count: rows.length })
+    .update({ univer_data: snapshot, row_count: totalRowCount })
     .eq("id", id);
 
   if (updateError) {

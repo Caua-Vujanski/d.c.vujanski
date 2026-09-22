@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { IWorkbookData } from "@univerjs/core";
 import { createClient } from "@/lib/supabase/server";
 import { buildWorkbookBuffer } from "@/lib/spreadsheet";
-import { snapshotToColumnsAndRows } from "@/lib/univer-sheet";
+import { snapshotToSheets } from "@/lib/univer-sheet";
 
 export async function GET(
   _request: Request,
@@ -31,11 +31,9 @@ export async function GET(
     );
   }
 
-  const { columns, rows } = snapshotToColumnsAndRows(
-    sheet.univer_data as IWorkbookData,
-  );
+  const sheets = snapshotToSheets(sheet.univer_data as IWorkbookData);
 
-  const buffer = await buildWorkbookBuffer(columns, rows);
+  const buffer = await buildWorkbookBuffer(sheets);
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

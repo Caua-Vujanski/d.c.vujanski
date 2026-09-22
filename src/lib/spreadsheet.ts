@@ -6,19 +6,35 @@ export interface SheetColumn {
   label: string;
 }
 
-export interface ParsedSheet {
-  columns: SheetColumn[];
-  rows: Record<string, unknown>[];
+export interface SheetMerge {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+}
+
+export interface ParsedGridSheet {
+  name: string;
+  // grid[rowIndex][colIndex], ambos 0-based; pode ter buracos em linhas/colunas vazias.
+  grid: unknown[][];
+  rowCount: number;
+  colCount: number;
+  merges: SheetMerge[];
+}
+
+export interface ParsedWorkbook {
+  sheets: ParsedGridSheet[];
 }
 
 // Limites defensivos: um arquivo malicioso/gigante não deve travar o servidor.
 const MAX_ROWS = 20000;
 const MAX_COLUMNS = 200;
+const MAX_SHEETS = 50;
 
-export async function parseSpreadsheet(
+export async function parseWorkbook(
   buffer: Buffer,
   filename: string,
-): Promise<ParsedSheet> {
+): Promise<ParsedWorkbook> {
   const workbook = new ExcelJS.Workbook();
   const lower = filename.toLowerCase();
 
@@ -32,42 +48,70 @@ export async function parseSpreadsheet(
     );
   }
 
-  const worksheet = workbook.worksheets[0];
-  if (!worksheet) {
+  const sheets = workbook.worksheets
+    .slice(0, MAX_SHEETS)
+    .map((worksheet) => parseWorksheet(worksheet));
+
+  if (sheets.length === 0) {
     throw new Error("Planilha vazia ou em formato não suportado.");
   }
 
-  const headerRow = worksheet.getRow(1);
-  const columns: SheetColumn[] = [];
-  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    if (colNumber > MAX_COLUMNS) return;
-    const label = cell.text?.trim() || `Coluna ${colNumber}`;
-    columns.push({ key: `col_${colNumber}`, label });
+  return { sheets };
+}
+
+function parseWorksheet(worksheet: ExcelJS.Worksheet): ParsedGridSheet {
+  const grid: unknown[][] = [];
+  let colCount = 0;
+
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    const rowIndex = rowNumber - 1;
+    if (rowIndex >= MAX_ROWS) return;
+
+    const rowValues: unknown[] = [];
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const colIndex = colNumber - 1;
+      if (colIndex >= MAX_COLUMNS) return;
+      rowValues[colIndex] = cellToValue(cell);
+    });
+    grid[rowIndex] = rowValues;
+    colCount = Math.max(colCount, rowValues.length);
   });
 
-  if (columns.length === 0) {
-    throw new Error(
-      "Não foi possível identificar cabeçalhos na primeira linha.",
-    );
+  colCount = Math.max(colCount, Math.min(worksheet.columnCount, MAX_COLUMNS));
+
+  const merges: SheetMerge[] = [];
+  for (const range of worksheet.model.merges ?? []) {
+    const parsed = parseRange(range);
+    if (parsed) merges.push(parsed);
   }
 
-  const rows: Record<string, unknown>[] = [];
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
-    if (rows.length >= MAX_ROWS) return;
+  return {
+    name: worksheet.name || "Planilha",
+    grid,
+    rowCount: grid.length,
+    colCount,
+    merges,
+  };
+}
 
-    const rowData: Record<string, unknown> = {};
-    let hasValue = false;
-    columns.forEach((col, index) => {
-      const cell = row.getCell(index + 1);
-      const value = cellToValue(cell);
-      if (value !== null && value !== "") hasValue = true;
-      rowData[col.key] = value;
-    });
-    if (hasValue) rows.push(rowData);
-  });
+function parseRange(range: string): SheetMerge | null {
+  const match = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i.exec(range);
+  if (!match) return null;
+  const [, colA, rowA, colB, rowB] = match;
+  return {
+    left: colLetterToIndex(colA),
+    top: Number(rowA) - 1,
+    right: colLetterToIndex(colB),
+    bottom: Number(rowB) - 1,
+  };
+}
 
-  return { columns, rows };
+function colLetterToIndex(letters: string): number {
+  let index = 0;
+  for (const ch of letters.toUpperCase()) {
+    index = index * 26 + (ch.charCodeAt(0) - 64);
+  }
+  return index - 1;
 }
 
 function cellToValue(cell: ExcelJS.Cell): string | number | boolean | null {
@@ -88,19 +132,28 @@ function cellToValue(cell: ExcelJS.Cell): string | number | boolean | null {
   return value;
 }
 
-export async function buildWorkbookBuffer(
-  columns: SheetColumn[],
-  rows: Record<string, unknown>[],
-): Promise<Buffer> {
+export async function buildWorkbookBuffer(sheets: ParsedGridSheet[]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet("Planilha");
 
-  worksheet.columns = columns.map((col) => ({
-    header: col.label,
-    key: col.key,
-    width: 20,
-  }));
-  rows.forEach((row) => worksheet.addRow(row));
+  sheets.forEach((sheet) => {
+    const worksheet = workbook.addWorksheet(sheet.name || "Planilha");
+    sheet.grid.forEach((rowValues, rowIndex) => {
+      if (!rowValues) return;
+      const row = worksheet.getRow(rowIndex + 1);
+      rowValues.forEach((value, colIndex) => {
+        row.getCell(colIndex + 1).value = value as ExcelJS.CellValue;
+      });
+      row.commit();
+    });
+    sheet.merges.forEach((merge) => {
+      worksheet.mergeCells(
+        merge.top + 1,
+        merge.left + 1,
+        merge.bottom + 1,
+        merge.right + 1,
+      );
+    });
+  });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
