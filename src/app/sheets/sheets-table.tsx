@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface SheetSummary {
   id: string;
@@ -16,6 +17,7 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<SheetSummary | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -24,7 +26,6 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
   }, [sheets, query]);
 
   async function handleTrash(sheet: SheetSummary) {
-    if (!window.confirm(`Mover "${sheet.name}" para a lixeira?`)) return;
     setBusyId(sheet.id);
     try {
       await fetch(`/api/sheets/${sheet.id}`, {
@@ -35,6 +36,7 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
       router.refresh();
     } finally {
       setBusyId(null);
+      setConfirmTarget(null);
     }
   }
 
@@ -126,7 +128,7 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
                   <div className="flex items-center justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
                       type="button"
-                      onClick={() => void handleTrash(sheet)}
+                      onClick={() => setConfirmTarget(sheet)}
                       disabled={busyId === sheet.id}
                       aria-label={`Mover ${sheet.name} para a lixeira`}
                       className="text-gray-400 hover:text-red-600 disabled:opacity-50"
@@ -151,6 +153,21 @@ export function SheetsTable({ sheets }: { sheets: SheetSummary[] }) {
           </tbody>
         </table>
       )}
+
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title="Mover para a lixeira"
+        message={
+          confirmTarget
+            ? `Tem certeza que deseja mover "${confirmTarget.name}" para a lixeira? Você pode restaurá-la depois.`
+            : ""
+        }
+        confirmLabel="Mover para a lixeira"
+        destructive
+        loading={busyId === confirmTarget?.id}
+        onConfirm={() => confirmTarget && void handleTrash(confirmTarget)}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </div>
   );
 }

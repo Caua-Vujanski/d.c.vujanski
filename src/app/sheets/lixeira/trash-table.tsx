@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface TrashedSheet {
   id: string;
@@ -14,6 +15,7 @@ interface TrashedSheet {
 export function TrashTable({ sheets }: { sheets: TrashedSheet[] }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<TrashedSheet | null>(null);
 
   async function handleRestore(sheet: TrashedSheet) {
     setBusyId(sheet.id);
@@ -30,18 +32,13 @@ export function TrashTable({ sheets }: { sheets: TrashedSheet[] }) {
   }
 
   async function handleDeleteForever(sheet: TrashedSheet) {
-    if (
-      !window.confirm(
-        `Excluir "${sheet.name}" definitivamente? Essa ação não pode ser desfeita.`,
-      )
-    )
-      return;
     setBusyId(sheet.id);
     try {
       await fetch(`/api/sheets/${sheet.id}`, { method: "DELETE" });
       router.refresh();
     } finally {
       setBusyId(null);
+      setConfirmTarget(null);
     }
   }
 
@@ -108,7 +105,7 @@ export function TrashTable({ sheets }: { sheets: TrashedSheet[] }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleDeleteForever(sheet)}
+                    onClick={() => setConfirmTarget(sheet)}
                     disabled={busyId === sheet.id}
                     className="text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
                   >
@@ -120,6 +117,21 @@ export function TrashTable({ sheets }: { sheets: TrashedSheet[] }) {
           ))}
         </tbody>
       </table>
+
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title="Excluir definitivamente"
+        message={
+          confirmTarget
+            ? `Tem certeza que deseja excluir "${confirmTarget.name}" para sempre? Essa ação não pode ser desfeita.`
+            : ""
+        }
+        confirmLabel="Excluir definitivamente"
+        destructive
+        loading={busyId === confirmTarget?.id}
+        onConfirm={() => confirmTarget && void handleDeleteForever(confirmTarget)}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </div>
   );
 }
