@@ -45,6 +45,10 @@ export default async function SheetPage({
         {
           name: sheet.name,
           grid,
+          styles: {},
+          formulas: {},
+          columnWidths: {},
+          rowHeights: {},
           rowCount: grid.length,
           colCount: columns.length,
           merges: [],
